@@ -272,6 +272,18 @@ def get_balances(db: Session = Depends(get_db)):
 
 # ── E-mail ────────────────────────────────────────────────────────────────────
 
+@app.post("/api/reset-email-status")
+def reset_email_status(order_date: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    target = date.fromisoformat(order_date) if order_date else date.today()
+    summary = db.query(DailySummary).filter(DailySummary.date == target).first()
+    if not summary:
+        raise HTTPException(404, "Geen samenvatting gevonden voor deze datum")
+    summary.email_sent = False
+    summary.email_sent_at = None
+    db.commit()
+    return {"message": "E-mailstatus gereset"}
+
+
 @app.post("/api/send-email")
 def trigger_send_email(order_date: Optional[str] = Query(None), db: Session = Depends(get_db)):
     target = date.fromisoformat(order_date) if order_date else date.today()

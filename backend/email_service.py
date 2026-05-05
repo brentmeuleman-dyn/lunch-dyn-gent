@@ -28,19 +28,18 @@ def _compose_body(orders: list, order_date: date) -> str:
         "",
     ]
 
-    for i, order in enumerate(orders, 1):
-        lines.append(f"{i}. {order.person_name}:")
+    for order in orders:
         for item in order.items:
             qty = item.get("quantity", 1)
             name = item.get("name", "")
             notes = item.get("notes", "")
-            line = f"   - {qty}x {name}"
+            line = f"- {qty}x {name}"
             if notes:
                 line += f"  ({notes})"
             lines.append(line)
         if order.notes:
-            lines.append(f"   Opmerking: {order.notes}")
-        lines.append("")
+            lines.append(f"  Opmerking: {order.notes}")
+    lines.append("")
 
     lines += [
         f"Totaal: {len(orders)} personen",
@@ -58,7 +57,7 @@ def _send(to: str, subject: str, body: str, cc: Optional[str] = None) -> bool:
 
     try:
         msg = MIMEMultipart()
-        msg["From"] = settings.SMTP_USER
+        msg["From"] = settings.FROM_EMAIL or settings.SMTP_USER
         msg["To"] = to
         msg["Subject"] = subject
         if cc:
