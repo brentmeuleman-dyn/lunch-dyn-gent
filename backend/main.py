@@ -12,7 +12,6 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.database import get_db, init_db
-from backend.email_service import send_order_email
 from backend.models import DailySummary, MenuItem, Order
 from backend.scheduler import start_scheduler, stop_scheduler
 
@@ -272,6 +271,19 @@ def get_balances(db: Session = Depends(get_db)):
 
 # ── E-mail ────────────────────────────────────────────────────────────────────
 
+@app.post("/api/mark-email-sent")
+def mark_email_sent(order_date: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    target = date.fromisoformat(order_date) if order_date else date.today()
+    summary = db.query(DailySummary).filter(DailySummary.date == target).first()
+    if not summary:
+        summary = DailySummary(date=target)
+        db.add(summary)
+    summary.email_sent = True
+    summary.email_sent_at = datetime.utcnow()
+    db.commit()
+    return {"message": "E-mail gemarkeerd als verstuurd"}
+
+
 @app.post("/api/reset-email-status")
 def reset_email_status(order_date: Optional[str] = Query(None), db: Session = Depends(get_db)):
     target = date.fromisoformat(order_date) if order_date else date.today()
@@ -282,31 +294,6 @@ def reset_email_status(order_date: Optional[str] = Query(None), db: Session = De
     summary.email_sent_at = None
     db.commit()
     return {"message": "E-mailstatus gereset"}
-
-
-@app.post("/api/send-email")
-def trigger_send_email(order_date: Optional[str] = Query(None), db: Session = Depends(get_db)):
-    target = date.fromisoformat(order_date) if order_date else date.today()
-    summary = db.query(DailySummary).filter(DailySummary.date == target).first()
-
-    if summary and summary.email_sent:
-        raise HTTPException(400, "E-mail al verstuurd voor deze dag")
-
-    orders = db.query(Order).filter(Order.date == target).all()
-    if not orders:
-        raise HTTPException(400, "Geen bestellingen voor deze dag")
-
-    success = send_order_email(orders, target)
-    if not success:
-        raise HTTPException(500, "E-mail kon niet verstuurd worden – controleer je SMTP-instellingen")
-
-    if not summary:
-        summary = DailySummary(date=target)
-        db.add(summary)
-    summary.email_sent = True
-    summary.email_sent_at = datetime.utcnow()
-    db.commit()
-    return {"message": "E-mail verstuurd!"}
 
 
 # ── Frontend ──────────────────────────────────────────────────────────────────

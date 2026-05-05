@@ -97,6 +97,7 @@
 
 <script>
 const API = '';
+const WEB3FORMS_KEY = '4fa18382-c8be-414c-85a8-eb25a7dd2c5a';
 let currentDate = todayStr();
 
 function todayStr() {
@@ -119,13 +120,8 @@ async function loadDate() {
   document.getElementById('orders-date-label').textContent = `— ${formatDate(currentDate)}`;
 
   const emailBtn = document.getElementById('btn-send-email');
-  if (data.email_sent) {
-    emailBtn.disabled = true;
-    emailBtn.textContent = '✅ Mail verstuurd';
-  } else {
-    emailBtn.disabled = false;
-    emailBtn.textContent = '📧 Mail versturen';
-  }
+  emailBtn.disabled = false;
+  emailBtn.textContent = data.email_sent ? '✅ Mail verstuurd (opnieuw versturen)' : '📧 Mail versturen';
 
   if (data.advancer) {
     document.getElementById('advancer-input').value = data.advancer;
@@ -217,19 +213,77 @@ async function unmarkRepaid(id) {
 
 async function sendEmail() {
   const statusEl = document.getElementById('email-status');
-  const res = await fetch(`${API}/api/send-email?order_date=${currentDate}`, { method: 'POST' });
+  const btn = document.getElementById('btn-send-email');
+  btn.disabled = true;
+  btn.textContent = '⏳ Bezig…';
+
+  const res = await fetch(`${API}/api/orders?order_date=${currentDate}`);
   const data = await res.json();
 
-  if (res.ok) {
-    statusEl.className = 'text-sm rounded-2xl px-5 py-3 font-medium bg-green-50 border border-green-200 text-green-700';
-    statusEl.textContent = '✅ ' + data.message;
-  } else {
-    statusEl.className = 'text-sm rounded-2xl px-5 py-3 font-medium bg-red-50 border border-red-200 text-brand-red';
-    statusEl.textContent = '❌ ' + (data.detail || 'Onbekende fout');
+  if (!data.orders.length) {
+    showEmailStatus(statusEl, false, 'Geen bestellingen voor deze dag');
+    btn.disabled = false;
+    btn.textContent = '📧 Mail versturen';
+    return;
   }
-  statusEl.classList.remove('hidden');
+
+  const w3res = await fetch('https://api.web3forms.com/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      access_key: WEB3FORMS_KEY,
+      subject: `Bestelling Dynapps Gent – ${formatDateLong(currentDate)}`,
+      message: formatEmailBody(data.orders, currentDate),
+      from_name: 'Lunch Dynapps Gent',
+    }),
+  });
+  const w3data = await w3res.json();
+
+  if (w3data.success) {
+    await fetch(`${API}/api/mark-email-sent?order_date=${currentDate}`, { method: 'POST' });
+    showEmailStatus(statusEl, true, 'E-mail verstuurd!');
+  } else {
+    showEmailStatus(statusEl, false, w3data.message || 'Onbekende fout');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '📧 Mail versturen';
   await loadDate();
   setTimeout(() => statusEl.classList.add('hidden'), 6000);
+}
+
+function showEmailStatus(el, ok, msg) {
+  el.className = ok
+    ? 'text-sm rounded-2xl px-5 py-3 font-medium bg-green-50 border border-green-200 text-green-700'
+    : 'text-sm rounded-2xl px-5 py-3 font-medium bg-red-50 border border-red-200 text-brand-red';
+  el.textContent = (ok ? '✅ ' : '❌ ') + msg;
+  el.classList.remove('hidden');
+}
+
+function formatEmailBody(orders, dateStr) {
+  const lines = [
+    'Goedemorgen,',
+    '',
+    `Hierbij onze bestelling voor ${formatDateLong(dateStr)}:`,
+    '',
+  ];
+  for (const order of orders) {
+    for (const item of order.items) {
+      const qty = item.quantity || 1;
+      let line = `- ${qty}x ${item.name || ''}`;
+      if (item.notes) line += `  (${item.notes})`;
+      lines.push(line);
+    }
+    if (order.notes) lines.push(`  Opmerking: ${order.notes}`);
+  }
+  lines.push('', `Totaal: ${orders.length} personen`, '', 'Met vriendelijke groeten,', 'Dynapps Gent');
+  return lines.join('\n');
+}
+
+function formatDateLong(iso) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('nl-BE', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
 }
 
 // ── Schulden ──────────────────────────────────────────────────────────────────
