@@ -24,3 +24,10 @@ def get_db():
 def init_db():
     from backend.models import MenuItem, Order, DailySummary  # noqa: F401
     Base.metadata.create_all(bind=engine)
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE menu_items ADD COLUMN garnish_price FLOAT"))
+            conn.commit()
+        except Exception:
+            pass

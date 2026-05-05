@@ -11,6 +11,7 @@ class MenuItem(Base):
     name = Column(String(200), nullable=False)
     category = Column(String(100), nullable=False)
     price = Column(Float, nullable=True)
+    garnish_price = Column(Float, nullable=True)
     description = Column(Text, nullable=True)
     available = Column(Boolean, default=True)
     last_scraped = Column(DateTime, default=datetime.utcnow)

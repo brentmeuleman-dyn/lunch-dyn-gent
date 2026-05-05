@@ -18,7 +18,7 @@ def start_scheduler():
     )
     _scheduler.add_job(
         _refresh_menu,
-        CronTrigger(hour=8, minute=0, day_of_week="mon-fri", timezone="Europe/Brussels"),
+        CronTrigger(hour=7, minute=30, day_of_week="mon-fri", timezone="Europe/Brussels"),
         id="daily_menu_refresh",
         replace_existing=True,
     )

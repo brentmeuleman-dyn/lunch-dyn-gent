@@ -1,158 +1,133 @@
+import json
 import logging
 import re
 from datetime import datetime
-from typing import Optional
 
-import requests
 from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright
 
 logger = logging.getLogger(__name__)
 
-BESTELLEN_URL = "https://www.keurslagerfilip.be/bestellen"
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Safari/537.36"
-    )
-}
+GARNISH_CATEGORIES = {"Kazen", "Vleeswaren", "Vis & schaaldieren", "Veggie"}
 
-KNOWN_CATEGORIES = [
-    "Belegde broodjes",
-    "Wraps",
-    "Koude schotels & maaltijden",
-    "Bakkerij",
-    "Drankjes",
-    "Schotels",
+SUBCATEGORY_PAGES = [
+    ("Belegde broodjes", "https://www.keurslagerfilip.be/bestellen/belegde-broodjes", True),
+    ("Schotels",         "https://www.keurslagerfilip.be/bestellen/schotels",         False),
 ]
 
 
 def scrape_menu() -> list[dict]:
-    """Haal menu-items op van keurslagerfilip.be/bestellen."""
     try:
-        response = requests.get(BESTELLEN_URL, headers=HEADERS, timeout=15)
-        response.raise_for_status()
-    except requests.RequestException as e:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            items = []
+            for category, url, use_subheadings in SUBCATEGORY_PAGES:
+                items.extend(_scrape_page(browser, url, category, use_subheadings))
+            browser.close()
+    except Exception as e:
         logger.error("Scraping mislukt: %s", e)
         return []
-
-    soup = BeautifulSoup(response.text, "html.parser")
-    items = _parse_products(soup)
-
-    if not items:
-        logger.warning(
-            "Geen producten gevonden via scraping. "
-            "De website gebruikt mogelijk JavaScript-rendering. "
-            "Voeg producten handmatig toe via de admin-pagina."
-        )
 
     logger.info("Scraping klaar: %d items gevonden", len(items))
     return items
 
 
-def _parse_products(soup: BeautifulSoup) -> list[dict]:
+def _scrape_page(browser, url: str, category: str, use_subheadings: bool = False) -> list[dict]:
     now = datetime.utcnow().isoformat()
+    try:
+        page = browser.new_page()
+        page.goto(url, wait_until="networkidle", timeout=30000)
+        html = page.content()
+        page.close()
+    except Exception as e:
+        logger.error("Fout bij laden %s: %s", url, e)
+        return []
 
-    # Probeer WooCommerce-stijl product-lijsten
-    products = soup.select("li.product, .product-item, [class*='product-card']")
+    soup = BeautifulSoup(html, "html.parser")
+    items = []
+    current_category = category
+    page_title_seen = False
 
-    if products:
-        return [item for p in products if (item := _parse_product_element(p, soup, now))]
+    for el in soup.find_all(True):
+        # Detecteer sub-categorie via H1 met klasse jw-heading-130
+        if use_subheadings and el.name == "h1" and "jw-heading-130" in " ".join(el.get("class", [])):
+            text = el.get_text(strip=True)
+            if not page_title_seen:
+                page_title_seen = True  # eerste H1 is de paginatitel, overslaan
+            elif text:
+                current_category = text
 
-    # Fallback: zoek per sectie op categorie-headers
-    return _parse_by_sections(soup, now)
+        # Verwerk producten
+        if "js-product-container" in " ".join(el.get("class", [])) and el.get("data-webshop-product"):
+            item = _parse_product(el, current_category, now)
+            if item:
+                items.append(item)
+
+    return items
 
 
-def _parse_product_element(element, soup: BeautifulSoup, now: str) -> Optional[dict]:
-    name = _first_text(element, [
-        ".woocommerce-loop-product__title",
-        ".product-title", "h2", "h3", "h4",
-        "[class*='title']", "[class*='name']",
-    ])
-    if not name or len(name) < 2:
+def _parse_product(element, category: str, now: str) -> dict | None:
+    try:
+        data = json.loads(element["data-webshop-product"])
+    except (KeyError, json.JSONDecodeError):
         return None
 
+    name = data.get("title", "").strip()
+    if not name:
+        return None
+
+    top = element.select_one(".product__top")
+    top_text = top.get_text(strip=True) if top else ""
+    price = _extract_price(top_text)
+
+    garnish_price = None
+    if category in GARNISH_CATEGORIES:
+        price_without, price_with = _extract_garnish_prices(element)
+        if price_without is not None:
+            price = price_without
+        if price_with is not None:
+            garnish_price = price_with
+
+    desc_el = element.select_one(".product__description")
+    description = desc_el.get_text(strip=True) or None if desc_el else None
+
     return {
-        "name": name.strip(),
-        "category": _detect_category(element, soup) or "Overige",
-        "price": _extract_price(element),
-        "description": _first_text(element, [
-            ".description", ".short-description", "p", "[class*='desc']"
-        ]),
+        "name": name,
+        "category": category,
+        "price": price,
+        "garnish_price": garnish_price,
+        "description": description,
         "available": True,
         "last_scraped": now,
     }
 
 
-def _parse_by_sections(soup: BeautifulSoup, now: str) -> list[dict]:
-    """Zoek producten georganiseerd onder categorie-headers."""
-    items = []
-    current_category = "Overige"
-
-    for el in soup.find_all(["h1", "h2", "h3", "h4", "li"]):
-        text = el.get_text(strip=True)
-        if not text:
+def _extract_garnish_prices(element) -> tuple[float | None, float | None]:
+    price_without = None
+    price_with = None
+    for opt in element.select("option"):
+        text = opt.get_text(strip=True)
+        text_lower = text.lower()
+        price = _extract_price(text)
+        if price is None:
             continue
-
-        # Detecteer categorie-header
-        for cat in KNOWN_CATEGORIES:
-            if cat.lower() in text.lower() and el.name in ["h1", "h2", "h3", "h4"]:
-                current_category = cat
-                break
-
-        # Productregels zijn korte <li>-elementen
-        if el.name == "li" and 3 < len(text) < 150:
-            items.append({
-                "name": text.split("€")[0].strip(),
-                "category": current_category,
-                "price": _extract_price(el),
-                "description": None,
-                "available": True,
-                "last_scraped": now,
-            })
-
-    return items
+        if "zonder garnituur" in text_lower:
+            price_without = price
+        elif text_lower.startswith("met garnituur") and "zonder" not in text_lower and price_with is None:
+            price_with = price
+    return price_without, price_with
 
 
-def _first_text(element, selectors: list[str]) -> Optional[str]:
-    for sel in selectors:
-        found = element.select_one(sel)
-        if found:
-            text = found.get_text(strip=True)
-            if text:
-                return text
-    return None
-
-
-def _extract_price(element) -> Optional[float]:
-    price_el = element.select_one(
-        ".price, .woocommerce-Price-amount, [class*='price']"
-    )
-    raw = price_el.get_text(strip=True) if price_el else element.get_text()
-    match = re.search(r"(\d+)[,.](\d{2})\s*€|€\s*(\d+)[,.](\d{2})", raw)
+def _extract_price(text: str) -> float | None:
+    match = re.search(r"(\d+)[,.](\d{2})", text)
     if match:
-        g = match.groups()
         try:
-            return float(f"{g[0] or g[2]}.{g[1] or g[3]}")
-        except (TypeError, ValueError):
+            return float(f"{match.group(1)}.{match.group(2)}")
+        except ValueError:
             pass
     return None
 
 
-def _detect_category(element, soup: BeautifulSoup) -> Optional[str]:
-    # data-attribuut (bijv. WooCommerce)
-    cat = element.get("data-category") or element.get("data-product-category")
-    if cat:
-        return cat
-
-    # Zoek omhoog in de DOM naar een categorie-header
+def _is_product_title(element) -> bool:
     parent = element.parent
-    while parent and parent.name != "body":
-        for header in parent.find_all(["h1", "h2", "h3", "h4"], recursive=False):
-            text = header.get_text(strip=True)
-            for known in KNOWN_CATEGORIES:
-                if known.lower() in text.lower():
-                    return known
-        parent = parent.parent
-
-    return None
+    return parent is not None and "product" in " ".join(parent.get("class", []))

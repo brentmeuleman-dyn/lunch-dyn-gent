@@ -77,21 +77,39 @@ class RepaidRequest(BaseModel):
 
 # ── Menu ─────────────────────────────────────────────────────────────────────
 
+CATEGORY_ORDER = [
+    "Kazen",
+    "Vleeswaren",
+    "Vis & schaaldieren",
+    "Veggie",
+    "Samengestelde broodjes",
+    "Wraps",
+    "Schotels",
+]
+
+
 @app.get("/api/menu")
 def get_menu(db: Session = Depends(get_db)):
     items = db.query(MenuItem).filter(MenuItem.available == True).order_by(  # noqa: E712
-        MenuItem.category, MenuItem.name
+        MenuItem.name
     ).all()
-    return [
-        {
-            "id": i.id,
-            "name": i.name,
-            "category": i.category,
-            "price": i.price,
-            "description": i.description,
-        }
-        for i in items
-    ]
+    return sorted(
+        [
+            {
+                "id": i.id,
+                "name": i.name,
+                "category": i.category,
+                "price": i.price,
+                "garnish_price": i.garnish_price,
+                "description": i.description,
+            }
+            for i in items
+        ],
+        key=lambda x: (
+            CATEGORY_ORDER.index(x["category"]) if x["category"] in CATEGORY_ORDER else len(CATEGORY_ORDER),
+            x["name"],
+        ),
+    )
 
 
 @app.post("/api/menu/refresh")
@@ -104,7 +122,8 @@ def refresh_menu(db: Session = Depends(get_db)):
     for d in items_data:
         db.add(MenuItem(
             name=d["name"], category=d["category"],
-            price=d.get("price"), description=d.get("description"), available=True,
+            price=d.get("price"), garnish_price=d.get("garnish_price"),
+            description=d.get("description"), available=True,
         ))
     db.commit()
     return {"message": f"{len(items_data)} items geladen"}
@@ -291,6 +310,11 @@ def serve_index():
 @app.get("/admin")
 def serve_admin():
     return FileResponse(FRONTEND_DIR / "admin.html")
+
+
+@app.get("/menu")
+def serve_menu():
+    return FileResponse(FRONTEND_DIR / "menu.html")
 
 
 # ── Helper ────────────────────────────────────────────────────────────────────

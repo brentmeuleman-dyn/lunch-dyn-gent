@@ -4,86 +4,153 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lunch Dynapps Gent</title>
+  <link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              purple:        '#7B00DC',
+              'purple-d':    '#6200b0',
+              'purple-l':    '#951CF3',
+              'purple-bg':   '#f5edff',
+              'purple-ring': '#d8b4fe',
+              red:           '#DC3545',
+              'red-d':       '#b82d3a',
+              navy:          '#010114',
+            }
+          },
+          fontFamily: { sans: ['Readex Pro', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
   <style>
-    .category-tab.active { @apply bg-orange-500 text-white; }
-    .item-card.selected  { @apply ring-2 ring-orange-500 bg-orange-50; }
+    .item-card.selected { box-shadow: 0 0 0 2px #7B00DC; background: #f5edff; }
+    .choice-btn         { @apply border-2 border-gray-200 rounded-xl py-2.5 px-4 text-sm font-medium text-gray-700 transition w-full; }
+    .choice-btn.active  { border-color: #7B00DC; background: #f5edff; color: #7B00DC; }
+    .choice-btn:hover:not(.active) { border-color: #d8b4fe; background: #faf5ff; }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen font-sans">
+<body class="bg-gray-50 min-h-screen font-sans text-brand-navy">
 
 <!-- Header -->
-<header class="bg-white shadow-sm sticky top-0 z-10">
-  <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+<header class="bg-brand-navy shadow-sm sticky top-0 z-10">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
     <div>
-      <h1 class="text-xl font-bold text-gray-800">🥪 Lunch Dynapps Gent</h1>
-      <p id="deadline-badge" class="text-xs text-gray-500 mt-0.5"></p>
+      <h1 class="text-xl font-bold text-white">🥪 Lunch Dynapps Gent</h1>
+      <p id="deadline-badge" class="text-xs text-gray-400 mt-0.5"></p>
     </div>
-    <a href="/admin" class="text-sm text-orange-500 hover:underline font-medium">Admin →</a>
+    <nav class="flex items-center gap-4">
+      <a href="/admin" class="text-sm text-white hover:underline font-medium">Admin</a>
+      <a href="/menu" class="text-sm text-white hover:underline font-medium">Menu beheren</a>
+    </nav>
   </div>
 </header>
 
-<main class="max-w-3xl mx-auto px-4 py-6 space-y-6">
+<div class="max-w-6xl mx-auto px-4 py-6">
+  <div class="flex flex-col lg:flex-row gap-6 items-start">
 
-  <!-- Naam invoer -->
-  <section class="bg-white rounded-2xl shadow-sm p-5">
-    <h2 class="font-semibold text-gray-700 mb-3">Wie ben jij?</h2>
-    <input id="person-name" type="text" placeholder="Voornaam Achternaam"
-           class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
-  </section>
+    <!-- Linkerkolom: Menu -->
+    <section class="bg-white rounded-2xl shadow-sm p-5 w-full lg:flex-1">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-semibold text-brand-navy">Menu van vandaag</h2>
+        <button onclick="loadMenu()" class="text-xs text-brand-purple hover:underline">↻ Vernieuwen</button>
+      </div>
+      <div id="category-tabs" class="flex flex-wrap gap-2 mb-4"></div>
+      <div id="menu-items" class="space-y-2"></div>
+      <p id="menu-empty" class="hidden text-sm text-gray-400 text-center py-8">
+        Geen menu geladen. Klik op Vernieuwen of voeg producten toe via de admin-pagina.
+      </p>
+    </section>
 
-  <!-- Menu -->
-  <section class="bg-white rounded-2xl shadow-sm p-5">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="font-semibold text-gray-700">Menu van vandaag</h2>
-      <button id="btn-refresh" onclick="loadMenu()"
-              class="text-xs text-orange-500 hover:underline">↻ Vernieuwen</button>
+    <!-- Rechterkolom -->
+    <div class="w-full lg:w-80 xl:w-96 shrink-0 space-y-4 lg:sticky lg:top-20">
+
+      <section class="bg-white rounded-2xl shadow-sm p-5">
+        <h2 class="font-semibold text-brand-navy mb-3">Wie ben jij?</h2>
+        <input id="person-name" type="text" placeholder="Voornaam Achternaam"
+               class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-purple-ring" />
+      </section>
+
+      <section id="cart-section" class="hidden bg-white rounded-2xl shadow-sm p-5">
+        <h2 class="font-semibold text-brand-navy mb-3">Jouw bestelling</h2>
+        <div id="cart-items" class="space-y-2 mb-4"></div>
+        <textarea id="order-notes" placeholder="Extra opmerkingen (optioneel)…"
+                  class="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-purple-ring" rows="2"></textarea>
+      </section>
+
+      <section class="bg-white rounded-2xl shadow-sm p-5">
+        <h2 class="font-semibold text-brand-navy mb-3">Bestellingen van vandaag</h2>
+        <div id="today-orders" class="space-y-1 text-sm text-gray-600">
+          <p class="text-gray-400 text-sm">Laden…</p>
+        </div>
+      </section>
+
+      <button id="btn-order" onclick="submitOrder()"
+              class="w-full bg-brand-red hover:bg-brand-red-d text-white font-semibold py-3.5 rounded-2xl shadow transition disabled:opacity-40 disabled:cursor-not-allowed">
+        Bestelling plaatsen
+      </button>
+
+      <div id="success-banner" class="hidden bg-green-50 border border-green-200 text-green-700 rounded-2xl px-5 py-4 text-sm font-medium text-center"></div>
+      <div id="error-banner"   class="hidden bg-red-50   border border-red-200   text-red-700   rounded-2xl px-5 py-4 text-sm font-medium text-center"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Keuze modal -->
+<div id="modal-backdrop" class="hidden fixed inset-0 bg-black/40 z-20" onclick="closeModal()"></div>
+<div id="choice-modal" class="hidden fixed inset-0 z-30 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+
+    <h3 id="modal-title" class="font-semibold text-brand-navy text-base mb-5"></h3>
+
+    <!-- Garnituur sectie -->
+    <div id="modal-garnish-section" class="hidden mb-5">
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Garnituur</p>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="btn-zonder" class="choice-btn" onclick="selectGarnish(false)">
+          <span class="block">Zonder garnituur</span>
+          <span id="price-zonder" class="text-xs opacity-70"></span>
+        </button>
+        <button id="btn-met" class="choice-btn" onclick="selectGarnish(true)">
+          <span class="block">Met garnituur</span>
+          <span id="price-met" class="text-xs opacity-70"></span>
+        </button>
+      </div>
     </div>
 
-    <!-- Categorie-tabs -->
-    <div id="category-tabs" class="flex flex-wrap gap-2 mb-4"></div>
-
-    <!-- Productenlijst -->
-    <div id="menu-items" class="space-y-2"></div>
-
-    <p id="menu-empty" class="hidden text-sm text-gray-400 text-center py-8">
-      Geen menu geladen. Klik op Vernieuwen of voeg producten toe via de admin-pagina.
-    </p>
-  </section>
-
-  <!-- Winkelmandje -->
-  <section id="cart-section" class="hidden bg-white rounded-2xl shadow-sm p-5">
-    <h2 class="font-semibold text-gray-700 mb-3">Jouw bestelling</h2>
-    <div id="cart-items" class="space-y-2 mb-4"></div>
-    <textarea id="order-notes" placeholder="Extra opmerkingen (optioneel)…"
-              class="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400" rows="2"></textarea>
-  </section>
-
-  <!-- Bevestigen -->
-  <button id="btn-order" onclick="submitOrder()"
-          class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3.5 rounded-2xl shadow transition disabled:opacity-40 disabled:cursor-not-allowed">
-    Bestelling plaatsen
-  </button>
-
-  <!-- Bevestigingsmelding -->
-  <div id="success-banner" class="hidden bg-green-50 border border-green-200 text-green-700 rounded-2xl px-5 py-4 text-sm font-medium text-center"></div>
-  <div id="error-banner"   class="hidden bg-red-50   border border-red-200   text-red-700   rounded-2xl px-5 py-4 text-sm font-medium text-center"></div>
-
-  <!-- Wie heeft er al besteld? -->
-  <section class="bg-white rounded-2xl shadow-sm p-5">
-    <h2 class="font-semibold text-gray-700 mb-3">Bestellingen van vandaag</h2>
-    <div id="today-orders" class="space-y-1 text-sm text-gray-600">
-      <p class="text-gray-400 text-sm">Laden…</p>
+    <!-- Brood sectie -->
+    <div id="modal-bread-section" class="hidden mb-5">
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Brood</p>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="btn-wit"   class="choice-btn" onclick="selectBread('wit')">Wit</button>
+        <button id="btn-bruin" class="choice-btn" onclick="selectBread('bruin')">Bruin</button>
+      </div>
     </div>
-  </section>
 
-</main>
+    <button id="btn-confirm-modal" onclick="confirmModal()" disabled
+            class="w-full bg-brand-purple text-white font-semibold py-3 rounded-xl transition disabled:opacity-30 disabled:cursor-not-allowed hover:bg-brand-purple-d mb-2">
+      Toevoegen aan bestelling
+    </button>
+    <button onclick="closeModal()" class="w-full text-xs text-gray-400 hover:text-gray-600 py-1">Annuleren</button>
+  </div>
+</div>
 
 <script>
 const API = '';
-let menuItems = [];
-let cart = {};          // { itemName: { name, quantity, notes } }
+const BREAD_CATEGORIES  = new Set(['Kazen','Vleeswaren','Vis & schaaldieren','Veggie','Samengestelde broodjes']);
+
+let menuItems      = [];
+let cart           = {};
 let activeCategory = null;
+
+// modal state
+let modalItem    = null;   // { name, price, garnishPrice, needsGarnish, needsBread }
+let modalGarnish = null;   // true | false | null
+let modalBread   = null;   // 'wit' | 'bruin' | null
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
@@ -99,7 +166,7 @@ function renderDeadline() {
   const badge = document.getElementById('deadline-badge');
   if (now > deadline) {
     badge.textContent = '⛔ Besteldeadline verstreken (10:00)';
-    badge.classList.add('text-red-500');
+    badge.classList.add('text-red-400');
     document.getElementById('btn-order').disabled = true;
   } else {
     const diff = Math.round((deadline - now) / 60000);
@@ -112,22 +179,21 @@ function renderDeadline() {
 async function loadMenu() {
   const res = await fetch(`${API}/api/menu`);
   menuItems = await res.json();
-
   const categories = [...new Set(menuItems.map(i => i.category))];
   if (!activeCategory && categories.length) activeCategory = categories[0];
-
   renderCategoryTabs(categories);
   renderMenuItems();
 }
 
 function renderCategoryTabs(categories) {
-  const container = document.getElementById('category-tabs');
-  container.innerHTML = categories.map(cat => `
-    <button onclick="setCategory('${cat}')"
-            class="category-tab px-3 py-1.5 rounded-full text-xs font-medium border border-gray-200 hover:bg-orange-100 transition ${cat === activeCategory ? 'bg-orange-500 text-white border-orange-500' : 'text-gray-600'}">
-      ${cat}
-    </button>
-  `).join('');
+  document.getElementById('category-tabs').innerHTML = categories.map(cat => `
+    <button onclick="setCategory('${escAttr(cat)}')"
+            class="px-3 py-1.5 rounded-full text-xs font-medium border transition
+                   ${cat === activeCategory
+                     ? 'bg-brand-purple text-white border-brand-purple'
+                     : 'border-gray-200 text-gray-600 hover:bg-brand-purple-bg hover:border-brand-purple hover:text-brand-purple'}">
+      ${escHtml(cat)}
+    </button>`).join('');
 }
 
 function setCategory(cat) {
@@ -139,28 +205,32 @@ function setCategory(cat) {
 function renderMenuItems() {
   const filtered = menuItems.filter(i => i.category === activeCategory);
   const container = document.getElementById('menu-items');
-  const empty = document.getElementById('menu-empty');
+  const empty     = document.getElementById('menu-empty');
 
-  if (!filtered.length) {
-    container.innerHTML = '';
-    empty.classList.remove('hidden');
-    return;
-  }
+  if (!filtered.length) { container.innerHTML = ''; empty.classList.remove('hidden'); return; }
   empty.classList.add('hidden');
 
   container.innerHTML = filtered.map(item => {
-    const inCart = cart[item.name];
+    const inCart      = cart[item.name];
+    const needsBread  = BREAD_CATEGORIES.has(item.category);
+    const priceLabel  = item.price
+      ? (item.garnish_price
+          ? `<span class="text-xs text-gray-400">v.a. </span><span class="text-xs font-semibold text-brand-purple">€${item.price.toFixed(2)}</span>`
+          : `<span class="text-xs font-semibold text-brand-purple">€${item.price.toFixed(2)}</span>`)
+      : '';
+
     return `
-    <div id="card-${item.id}" class="item-card border border-gray-100 rounded-xl p-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-orange-50 transition ${inCart ? 'ring-2 ring-orange-500 bg-orange-50' : ''}"
-         onclick="toggleItem(${item.id}, '${escHtml(item.name)}')">
+    <div id="card-${item.id}"
+         class="item-card border border-gray-100 rounded-xl p-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-brand-purple-bg transition ${inCart ? 'selected' : ''}"
+         onclick="toggleItem('${escAttr(item.name)}', ${item.price || 0}, ${item.garnish_price || 'null'}, '${escAttr(item.category)}')">
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium text-gray-800 truncate">${escHtml(item.name)}</p>
+        <p class="text-sm font-medium text-brand-navy truncate">${escHtml(item.name)}</p>
         ${item.description ? `<p class="text-xs text-gray-400 truncate">${escHtml(item.description)}</p>` : ''}
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        ${item.price ? `<span class="text-xs font-semibold text-orange-500">€${item.price.toFixed(2)}</span>` : ''}
-        <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs
-                    ${inCart ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-300 text-gray-300'}">
+        ${priceLabel}
+        <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs transition
+                    ${inCart ? 'bg-brand-purple border-brand-purple text-white' : 'border-gray-300 text-gray-300'}">
           ${inCart ? '✓' : '+'}
         </div>
       </div>
@@ -168,43 +238,148 @@ function renderMenuItems() {
   }).join('');
 }
 
-function toggleItem(id, name) {
+function toggleItem(name, price, garnishPrice, category) {
   if (cart[name]) {
     delete cart[name];
-  } else {
-    cart[name] = { name, quantity: 1, notes: '' };
+    renderMenuItems();
+    renderCart();
+    return;
   }
+  const needsGarnish = garnishPrice !== null;
+  const needsBread   = BREAD_CATEGORIES.has(category);
+
+  if (needsGarnish || needsBread) {
+    openModal(name, price, garnishPrice, needsGarnish, needsBread);
+  } else {
+    cart[name] = { name, quantity: 1, notes: '', garnish: null, bread: null, price };
+    renderMenuItems();
+    renderCart();
+  }
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+function openModal(name, price, garnishPrice, needsGarnish, needsBread) {
+  modalItem    = { name, price, garnishPrice, needsGarnish, needsBread };
+  modalGarnish = needsGarnish ? null : undefined;
+  modalBread   = needsBread   ? null : undefined;
+
+  document.getElementById('modal-title').textContent = name;
+
+  // Garnituur sectie
+  const garnishSection = document.getElementById('modal-garnish-section');
+  if (needsGarnish) {
+    document.getElementById('price-zonder').textContent = `€${price.toFixed(2)}`;
+    document.getElementById('price-met').textContent    = `€${garnishPrice.toFixed(2)}`;
+    document.getElementById('btn-zonder').classList.remove('active');
+    document.getElementById('btn-met').classList.remove('active');
+    garnishSection.classList.remove('hidden');
+  } else {
+    garnishSection.classList.add('hidden');
+  }
+
+  // Brood sectie
+  const breadSection = document.getElementById('modal-bread-section');
+  if (needsBread) {
+    document.getElementById('btn-wit').classList.remove('active');
+    document.getElementById('btn-bruin').classList.remove('active');
+    breadSection.classList.remove('hidden');
+  } else {
+    breadSection.classList.add('hidden');
+  }
+
+  updateConfirmButton();
+  document.getElementById('modal-backdrop').classList.remove('hidden');
+  document.getElementById('choice-modal').classList.remove('hidden');
+}
+
+function selectGarnish(withGarnish) {
+  modalGarnish = withGarnish;
+  document.getElementById('btn-zonder').classList.toggle('active', !withGarnish);
+  document.getElementById('btn-met').classList.toggle('active', withGarnish);
+  updateConfirmButton();
+}
+
+function selectBread(type) {
+  modalBread = type;
+  document.getElementById('btn-wit').classList.toggle('active', type === 'wit');
+  document.getElementById('btn-bruin').classList.toggle('active', type === 'bruin');
+  updateConfirmButton();
+}
+
+function updateConfirmButton() {
+  const garnishOk = modalItem.needsGarnish ? modalGarnish !== null : true;
+  const breadOk   = modalItem.needsBread   ? modalBread   !== null : true;
+  document.getElementById('btn-confirm-modal').disabled = !(garnishOk && breadOk);
+}
+
+function confirmModal() {
+  if (!modalItem) return;
+  const { name, price, garnishPrice, needsGarnish } = modalItem;
+  const effectivePrice = needsGarnish
+    ? (modalGarnish ? garnishPrice : price)
+    : price;
+
+  cart[name] = {
+    name,
+    quantity: 1,
+    notes: '',
+    garnish: needsGarnish ? modalGarnish : null,
+    bread:   modalBread ?? null,
+    price:   effectivePrice,
+  };
+  closeModal();
   renderMenuItems();
   renderCart();
+}
+
+function closeModal() {
+  modalItem = null;
+  document.getElementById('modal-backdrop').classList.add('hidden');
+  document.getElementById('choice-modal').classList.add('hidden');
 }
 
 // ── Winkelmandje ─────────────────────────────────────────────────────────────
 
 function renderCart() {
-  const section = document.getElementById('cart-section');
+  const section   = document.getElementById('cart-section');
   const container = document.getElementById('cart-items');
-  const items = Object.values(cart);
+  const items     = Object.values(cart);
 
   if (!items.length) { section.classList.add('hidden'); return; }
   section.classList.remove('hidden');
 
-  container.innerHTML = items.map(item => `
-    <div class="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-      <button onclick="removeFromCart('${escHtml(item.name)}')"
-              class="text-gray-300 hover:text-red-400 text-lg leading-none">×</button>
-      <span class="flex-1 text-sm text-gray-700">${escHtml(item.name)}</span>
-      <div class="flex items-center gap-1">
-        <button onclick="changeQty('${escHtml(item.name)}', -1)"
+  container.innerHTML = items.map(item => {
+    const tags = [];
+    if (item.garnish === true)  tags.push('<span class="text-brand-purple-l">met garnituur</span>');
+    if (item.garnish === false) tags.push('<span class="text-gray-400">zonder garnituur</span>');
+    if (item.bread)             tags.push(`<span class="text-gray-500">${item.bread}</span>`);
+    const tagLine = tags.length
+      ? `<span class="text-xs"> (${tags.join(', ')})</span>` : '';
+    const priceLabel = item.price
+      ? `<span class="text-xs text-brand-purple font-semibold shrink-0">€${(item.price * item.quantity).toFixed(2)}</span>`
+      : '';
+
+    return `
+    <div class="flex items-center gap-2 py-2 border-b border-gray-50 last:border-0">
+      <button onclick="removeFromCart('${escAttr(item.name)}')"
+              class="text-gray-300 hover:text-brand-red text-lg leading-none shrink-0">×</button>
+      <div class="flex-1 min-w-0 text-sm">
+        <span class="text-brand-navy">${escHtml(item.name)}</span>${tagLine}
+      </div>
+      <div class="flex items-center gap-1 shrink-0">
+        <button onclick="changeQty('${escAttr(item.name)}', -1)"
                 class="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 text-sm font-bold flex items-center justify-center">−</button>
         <span class="w-5 text-center text-sm font-medium">${item.quantity}</span>
-        <button onclick="changeQty('${escHtml(item.name)}', 1)"
+        <button onclick="changeQty('${escAttr(item.name)}', 1)"
                 class="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 text-sm font-bold flex items-center justify-center">+</button>
       </div>
-      <input type="text" placeholder="opmerking…" value="${escHtml(item.notes)}"
-             oninput="setNotes('${escHtml(item.name)}', this.value)"
-             class="w-28 text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-300" />
-    </div>
-  `).join('');
+      ${priceLabel}
+      <input type="text" placeholder="opmerking…" value="${escAttr(item.notes)}"
+             oninput="setNotes('${escAttr(item.name)}', this.value)"
+             class="w-20 text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-purple-ring shrink-0" />
+    </div>`;
+  }).join('');
 }
 
 function removeFromCart(name) { delete cart[name]; renderMenuItems(); renderCart(); }
@@ -221,24 +396,29 @@ async function submitOrder() {
   const name = document.getElementById('person-name').value.trim();
   if (!name) { showError('Voer eerst je naam in.'); return; }
 
-  const items = Object.values(cart);
-  if (!items.length) { showError('Selecteer minstens één item.'); return; }
+  const cartItems = Object.values(cart);
+  if (!cartItems.length) { showError('Selecteer minstens één item.'); return; }
 
-  const notes = document.getElementById('order-notes').value.trim();
+  const notes  = document.getElementById('order-notes').value.trim();
+  const items  = cartItems.map(item => ({
+    name:     formatItemName(item),
+    quantity: item.quantity,
+    notes:    item.notes || null,
+  }));
+  const amount = cartItems.reduce((sum, i) => sum + (i.price || 0) * i.quantity, 0);
 
   try {
     const res = await fetch(`${API}/api/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ person_name: name, items, notes: notes || null }),
+      body: JSON.stringify({ person_name: name, items, notes: notes || null, amount: Math.round(amount * 100) / 100 }),
     });
     const data = await res.json();
-
     if (!res.ok) { showError(data.detail || 'Er is een fout opgetreden.'); return; }
 
     cart = {};
-    document.getElementById('person-name').value = '';
-    document.getElementById('order-notes').value = '';
+    document.getElementById('person-name').value  = '';
+    document.getElementById('order-notes').value  = '';
     renderMenuItems();
     renderCart();
     showSuccess(`✅ Bestelling geplaatst voor ${name}!`);
@@ -248,10 +428,18 @@ async function submitOrder() {
   }
 }
 
+function formatItemName(item) {
+  const parts = [];
+  if (item.garnish === true)  parts.push('met garnituur');
+  if (item.garnish === false) parts.push('zonder garnituur');
+  if (item.bread)             parts.push(item.bread);
+  return parts.length ? `${item.name} (${parts.join(', ')})` : item.name;
+}
+
 // ── Huidige bestellingen ──────────────────────────────────────────────────────
 
 async function loadTodayOrders() {
-  const res = await fetch(`${API}/api/orders`);
+  const res  = await fetch(`${API}/api/orders`);
   const data = await res.json();
   const container = document.getElementById('today-orders');
 
@@ -259,39 +447,34 @@ async function loadTodayOrders() {
     container.innerHTML = '<p class="text-gray-400 text-sm">Nog niemand besteld vandaag.</p>';
     return;
   }
-
   container.innerHTML = data.orders.map(o => `
     <div class="flex items-start gap-2 py-1.5 border-b border-gray-50 last:border-0">
       <span class="text-green-500 mt-0.5 shrink-0">✓</span>
       <div>
-        <span class="font-medium text-gray-800">${escHtml(o.person_name)}</span>
+        <span class="font-medium text-brand-navy">${escHtml(o.person_name)}</span>
         <span class="text-gray-400 text-xs ml-1">
-          – ${o.items.map(i => `${i.quantity}× ${i.name}`).join(', ')}
+          – ${o.items.map(i => `${i.quantity}× ${escHtml(i.name)}`).join(', ')}
         </span>
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function showSuccess(msg) {
   const el = document.getElementById('success-banner');
-  el.textContent = msg;
-  el.classList.remove('hidden');
+  el.textContent = msg; el.classList.remove('hidden');
   document.getElementById('error-banner').classList.add('hidden');
   setTimeout(() => el.classList.add('hidden'), 5000);
 }
 function showError(msg) {
   const el = document.getElementById('error-banner');
-  el.textContent = msg;
-  el.classList.remove('hidden');
+  el.textContent = msg; el.classList.remove('hidden');
   document.getElementById('success-banner').classList.add('hidden');
   setTimeout(() => el.classList.add('hidden'), 5000);
 }
-function escHtml(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+function escHtml(s)  { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s)  { return String(s ?? '').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 
 init();
 </script>
