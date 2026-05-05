@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(& \"C:\\\\Program Files\\\\Git\\\\bin\\\\git.exe\" --version 2>&1)",
+      "PowerShell(& \"C:\\\\Program Files \\(x86\\)\\\\Git\\\\bin\\\\git.exe\" --version 2>&1)",
+      "PowerShell(Get-Command git -ErrorAction SilentlyContinue)",
+      "PowerShell(Head -20)",
+      "PowerShell(gh --version 2>&1)",
+      "mcp__claude_ai_DynappsGit__github_get_tree",
+      "mcp__claude_ai_DynappsGit__github_get_repo",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git add *)"
+    ]
+  }
+}

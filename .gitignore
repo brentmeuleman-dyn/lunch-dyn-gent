@@ -1,0 +1,18 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Database
+*.db
+*.sqlite3
+
+# Omgevingsvariabelen (nooit committen!)
+.env
+
+# Editor
+.vscode/
+*.swp
