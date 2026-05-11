@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Schulden – Lunch Dynapps Gent</title>
+  <link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              purple:        '#7B00DC',
+              'purple-d':    '#6200b0',
+              'purple-l':    '#951CF3',
+              'purple-bg':   '#f5edff',
+              'purple-ring': '#d8b4fe',
+              red:           '#DC3545',
+              'red-d':       '#b82d3a',
+              navy:          '#010114',
+            }
+          },
+          fontFamily: { sans: ['Readex Pro', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans text-brand-navy">
+
+<!-- Header -->
+<header class="bg-brand-navy shadow-sm sticky top-0 z-10">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-bold text-white">💸 Schulden – Lunch Dynapps Gent</h1>
+      <p id="deadline-badge" class="text-xs text-gray-400 mt-0.5"></p>
+    </div>
+    <nav class="flex items-center gap-4">
+      <a href="/" class="text-sm text-white hover:underline font-medium">Bestelformulier</a>
+      <a href="/admin" class="text-sm text-white hover:underline font-medium">Admin</a>
+      <a href="/schulden" class="text-sm text-white font-semibold underline">Schulden</a>
+      <a href="/menu" class="text-sm text-white hover:underline font-medium">Menu</a>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+
+  <!-- Filters -->
+  <section class="bg-white rounded-2xl shadow-sm p-5">
+    <div class="flex flex-wrap gap-3 items-end">
+      <div class="flex-1 min-w-36">
+        <label class="text-xs font-medium text-gray-500 block mb-1">Datum</label>
+        <select id="filter-date"
+                class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple-ring">
+          <option value="">Alle datums</option>
+        </select>
+      </div>
+      <div class="flex-1 min-w-36">
+        <label class="text-xs font-medium text-gray-500 block mb-1">Voorschieter</label>
+        <select id="filter-advancer"
+                class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple-ring">
+          <option value="">Alle voorschieters</option>
+        </select>
+      </div>
+      <div class="flex-1 min-w-36">
+        <label class="text-xs font-medium text-gray-500 block mb-1">Schuldenaar</label>
+        <select id="filter-debtor"
+                class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple-ring">
+          <option value="">Alle schuldenaren</option>
+        </select>
+      </div>
+      <button onclick="resetFilters()"
+              class="text-sm text-gray-400 hover:text-brand-navy px-3 py-2 transition">
+        ✕ Reset
+      </button>
+    </div>
+  </section>
+
+  <!-- Overzicht -->
+  <section class="bg-white rounded-2xl shadow-sm p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-brand-navy">Openstaande schulden per dag</h2>
+      <span id="total-badge" class="text-sm font-bold text-brand-red"></span>
+    </div>
+    <div id="schulden-list">
+      <p class="text-gray-400 text-sm text-center py-6">Laden…</p>
+    </div>
+  </section>
+
+</main>
+
+<script>
+const API = '';
+let allData = [];
+
+function renderDeadline() {
+  const now = new Date();
+  const deadline = new Date(); deadline.setHours(10, 0, 0, 0);
+  const badge = document.getElementById('deadline-badge');
+  if (now > deadline) {
+    badge.textContent = '⛔ Besteldeadline verstreken (10:00)';
+    badge.classList.add('text-red-400');
+  } else {
+    const diff = Math.round((deadline - now) / 60000);
+    badge.textContent = `⏰ Bestellen kan nog – deadline om 10:00 (nog ${diff} min)`;
+  }
+}
+
+async function init() {
+  renderDeadline();
+  const res = await fetch(`${API}/api/balances/by-date`);
+  allData = await res.json();
+
+  populateFilters();
+  render();
+
+  document.getElementById('filter-date').addEventListener('change', render);
+  document.getElementById('filter-advancer').addEventListener('change', render);
+  document.getElementById('filter-debtor').addEventListener('change', render);
+}
+
+function populateFilters() {
+  const dates     = [...new Set(allData.map(d => d.date))].sort().reverse();
+  const advancers = [...new Set(allData.flatMap(d => d.entries.map(e => e.advancer)))].sort();
+  const debtors   = [...new Set(allData.flatMap(d => d.entries.map(e => e.person)))].sort();
+
+  fillSelect('filter-date',     dates,     d => formatDate(d));
+  fillSelect('filter-advancer', advancers, a => a);
+  fillSelect('filter-debtor',   debtors,   p => p);
+}
+
+function fillSelect(id, values, labelFn) {
+  const sel = document.getElementById(id);
+  values.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = labelFn(v);
+    sel.appendChild(opt);
+  });
+}
+
+function render() {
+  const filterDate     = document.getElementById('filter-date').value;
+  const filterAdvancer = document.getElementById('filter-advancer').value;
+  const filterDebtor   = document.getElementById('filter-debtor').value;
+  const container      = document.getElementById('schulden-list');
+
+  let filtered = allData
+    .filter(d => !filterDate     || d.date === filterDate)
+    .filter(d => !filterAdvancer || d.entries.some(e => e.advancer === filterAdvancer))
+    .map(d => ({
+      ...d,
+      entries: filterDebtor ? d.entries.filter(e => e.person === filterDebtor) : d.entries,
+    }))
+    .filter(d => d.entries.length > 0);
+
+  if (!filtered.length) {
+    container.innerHTML = '<p class="text-green-600 text-sm text-center py-6">🎉 Geen openstaande schulden!</p>';
+    document.getElementById('total-badge').textContent = '';
+    return;
+  }
+
+  const grandTotal = filtered.reduce((sum, d) => sum + d.entries.reduce((s, e) => s + (e.amount || 0), 0), 0);
+  document.getElementById('total-badge').textContent = `Totaal open: €${grandTotal.toFixed(2)}`;
+
+  container.innerHTML = filtered.map(day => `
+    <div class="border border-gray-100 rounded-xl p-4 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <p class="font-semibold text-brand-navy">
+          ${formatDate(day.date)}
+          <span class="text-brand-navy font-normal"> — Voorschieter: ${escHtml(day.entries[0]?.advancer ?? '')}</span>
+        </p>
+        <span class="text-sm font-bold text-brand-red">€${day.entries.reduce((s, e) => s + (e.amount || 0), 0).toFixed(2)} open</span>
+      </div>
+      <div class="space-y-1">
+        ${day.entries.map(e => `
+          <div class="flex items-center justify-between text-sm py-1.5 px-2 hover:bg-brand-purple-bg rounded-lg">
+            <span class="font-medium text-brand-navy">${escHtml(e.person)}</span>
+            <div class="flex items-center gap-3">
+              <span class="font-medium">${e.amount != null ? `€${e.amount.toFixed(2)}` : '?'}</span>
+              <button onclick="markRepaid(${e.order_id})"
+                      class="text-xs bg-brand-purple-bg hover:bg-purple-200 text-brand-purple px-2 py-1 rounded-lg transition">
+                Betaald ✓
+              </button>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function resetFilters() {
+  document.getElementById('filter-date').value     = '';
+  document.getElementById('filter-advancer').value = '';
+  document.getElementById('filter-debtor').value   = '';
+  render();
+}
+
+async function markRepaid(id) {
+  await fetch(`${API}/api/payments/repaid`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ order_id: id }),
+  });
+  const res = await fetch(`${API}/api/balances/by-date`);
+  allData = await res.json();
+  populateFilters();
+  render();
+}
+
+function formatDate(iso) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('nl-BE', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
+}
+
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+init();
+</script>
+</body>
+</html>

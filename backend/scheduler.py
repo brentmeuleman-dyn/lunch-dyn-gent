@@ -1,5 +1,4 @@
 import logging
-from datetime import date, datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -11,55 +10,19 @@ _scheduler = BackgroundScheduler(timezone="Europe/Brussels")
 
 def start_scheduler():
     _scheduler.add_job(
-        _send_daily_orders,
-        CronTrigger(hour=10, minute=0, day_of_week="mon-fri", timezone="Europe/Brussels"),
-        id="daily_order_email",
-        replace_existing=True,
-    )
-    _scheduler.add_job(
         _refresh_menu,
         CronTrigger(hour=7, minute=30, day_of_week="mon-fri", timezone="Europe/Brussels"),
         id="daily_menu_refresh",
         replace_existing=True,
     )
     _scheduler.start()
-    logger.info("Scheduler gestart (dagelijkse mail om 10:00, menu refresh om 08:00)")
+    logger.info("Scheduler gestart (menu refresh om 07:30)")
 
 
 def stop_scheduler():
     if _scheduler.running:
         _scheduler.shutdown()
 
-
-def _send_daily_orders():
-    from backend.database import SessionLocal
-    from backend.email_service import send_order_email
-    from backend.models import DailySummary, Order
-
-    db = SessionLocal()
-    try:
-        today = date.today()
-        summary = db.query(DailySummary).filter(DailySummary.date == today).first()
-
-        if summary and summary.email_sent:
-            return
-
-        orders = db.query(Order).filter(Order.date == today).all()
-        if not orders:
-            logger.info("Geen bestellingen voor %s, mail overgeslagen", today)
-            return
-
-        success = send_order_email(orders, today)
-        if success:
-            if not summary:
-                summary = DailySummary(date=today)
-                db.add(summary)
-            summary.email_sent = True
-            summary.email_sent_at = datetime.utcnow()
-            db.commit()
-            logger.info("Dagelijkse bestelling verstuurd voor %s", today)
-    finally:
-        db.close()
 
 
 def _refresh_menu():
@@ -77,6 +40,7 @@ def _refresh_menu():
                     name=data["name"],
                     category=data["category"],
                     price=data.get("price"),
+                    garnish_price=data.get("garnish_price"),
                     description=data.get("description"),
                     available=True,
                 ))

@@ -35,11 +35,15 @@
 <!-- Header -->
 <header class="bg-brand-navy shadow-sm sticky top-0 z-10">
   <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-    <h1 class="text-xl font-bold text-white">⚙️ Admin – Lunch Dynapps Gent</h1>
+    <div>
+      <h1 class="text-xl font-bold text-white">⚙️ Admin – Lunch Dynapps Gent</h1>
+      <p id="deadline-badge" class="text-xs text-gray-400 mt-0.5"></p>
+    </div>
     <nav class="flex items-center gap-4">
-      <a href="/" class="text-sm text-white hover:underline font-medium">← Bestelformulier</a>
-      <a href="/admin" class="text-sm text-white hover:underline font-medium">Admin</a>
-      <a href="/menu" class="text-sm text-white hover:underline font-medium">Menu beheren</a>
+      <a href="/" class="text-sm text-white hover:underline font-medium">Bestelformulier</a>
+      <a href="/admin" class="text-sm text-white font-semibold underline">Admin</a>
+      <a href="/schulden" class="text-sm text-white hover:underline font-medium">Schulden</a>
+      <a href="/menu" class="text-sm text-white hover:underline font-medium">Menu</a>
     </nav>
   </div>
 </header>
@@ -86,7 +90,7 @@
 
   <!-- Openstaande schulden -->
   <section class="bg-white rounded-2xl shadow-sm p-5">
-    <h2 class="font-semibold text-brand-navy mb-4">Openstaande schulden</h2>
+    <h2 class="font-semibold text-brand-navy mb-4">Openstaande schulden <span id="balances-date-label" class="text-gray-400 font-normal text-sm"></span></h2>
     <div id="balances" class="space-y-4">
       <p class="text-gray-400 text-sm text-center py-4">Laden…</p>
     </div>
@@ -105,9 +109,22 @@ function todayStr() {
 }
 
 async function init() {
+  renderDeadline();
   document.getElementById('date-picker').value = currentDate;
   await loadDate();
-  await loadBalances();
+}
+
+function renderDeadline() {
+  const now = new Date();
+  const deadline = new Date(); deadline.setHours(10, 0, 0, 0);
+  const badge = document.getElementById('deadline-badge');
+  if (now > deadline) {
+    badge.textContent = '⛔ Besteldeadline verstreken (10:00)';
+    badge.classList.add('text-red-400');
+  } else {
+    const diff = Math.round((deadline - now) / 60000);
+    badge.textContent = `⏰ Bestellen kan nog – deadline om 10:00 (nog ${diff} min)`;
+  }
 }
 
 // ── Bestellingen laden ────────────────────────────────────────────────────────
@@ -128,6 +145,7 @@ async function loadDate() {
   }
 
   renderOrdersTable(data.orders, data.advancer);
+  await loadBalances();
 }
 
 function renderOrdersTable(orders, advancer) {
@@ -289,7 +307,8 @@ function formatDateLong(iso) {
 // ── Schulden ──────────────────────────────────────────────────────────────────
 
 async function loadBalances() {
-  const res = await fetch(`${API}/api/balances`);
+  document.getElementById('balances-date-label').textContent = `— ${formatDate(currentDate)}`;
+  const res = await fetch(`${API}/api/balances?order_date=${currentDate}`);
   const data = await res.json();
   const container = document.getElementById('balances');
 

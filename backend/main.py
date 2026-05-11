@@ -220,6 +220,13 @@ def set_advancer(req: AdvancerRequest, db: Session = Depends(get_db)):
         db.add(summary)
     summary.advancer = req.advancer
     db.query(Order).filter(Order.date == target).update({"advanced_by": req.advancer})
+    own_order = db.query(Order).filter(
+        Order.date == target,
+        Order.person_name == req.advancer,
+    ).first()
+    if own_order:
+        own_order.repaid = True
+        own_order.repaid_at = datetime.utcnow()
     db.commit()
     return {"message": f"{req.advancer} ingesteld als voorschietende persoon"}
 
@@ -246,9 +253,34 @@ def mark_unrepaid(order_id: int, db: Session = Depends(get_db)):
     return {"message": f"{order.person_name} gemarkeerd als niet terugbetaald"}
 
 
-@app.get("/api/balances")
-def get_balances(db: Session = Depends(get_db)):
+@app.get("/api/balances/by-date")
+def get_balances_by_date(db: Session = Depends(get_db)):
     orders = db.query(Order).filter(
+        Order.advanced_by.isnot(None),
+        Order.repaid == False,  # noqa: E712
+    ).order_by(Order.date.desc()).all()
+
+    by_date: dict = {}
+    for o in orders:
+        d = o.date.isoformat()
+        if d not in by_date:
+            by_date[d] = {"date": d, "entries": [], "total": 0.0}
+        by_date[d]["entries"].append({
+            "person": o.person_name,
+            "advancer": o.advanced_by,
+            "amount": o.amount,
+            "order_id": o.id,
+        })
+        by_date[d]["total"] += o.amount or 0
+
+    return list(by_date.values())
+
+
+@app.get("/api/balances")
+def get_balances(order_date: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    target = date.fromisoformat(order_date) if order_date else date.today()
+    orders = db.query(Order).filter(
+        Order.date == target,
         Order.advanced_by.isnot(None),
         Order.repaid == False,  # noqa: E712
     ).all()
@@ -314,6 +346,11 @@ def serve_admin():
 @app.get("/menu")
 def serve_menu():
     return FileResponse(FRONTEND_DIR / "menu.html")
+
+
+@app.get("/schulden")
+def serve_schulden():
+    return FileResponse(FRONTEND_DIR / "schulden.html")
 
 
 # ── Helper ────────────────────────────────────────────────────────────────────

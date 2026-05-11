@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Menu beheren – Lunch Dynapps Gent</title>
+  <title>Menu – Lunch Dynapps Gent</title>
   <link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -33,11 +33,15 @@
 <!-- Header -->
 <header class="bg-brand-navy shadow-sm sticky top-0 z-10">
   <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-    <h1 class="text-xl font-bold text-white">🍽️ Menu beheren – Lunch Dynapps Gent</h1>
+    <div>
+      <h1 class="text-xl font-bold text-white">🍽️ Menu – Lunch Dynapps Gent</h1>
+      <p id="deadline-badge" class="text-xs text-gray-400 mt-0.5"></p>
+    </div>
     <nav class="flex items-center gap-4">
-      <a href="/" class="text-sm text-white hover:underline font-medium">← Bestelformulier</a>
+      <a href="/" class="text-sm text-white hover:underline font-medium">Bestelformulier</a>
       <a href="/admin" class="text-sm text-white hover:underline font-medium">Admin</a>
-      <a href="/menu" class="text-sm text-white font-semibold underline">Menu beheren</a>
+      <a href="/schulden" class="text-sm text-white hover:underline font-medium">Schulden</a>
+      <a href="/menu" class="text-sm text-white font-semibold underline">Menu</a>
     </nav>
   </div>
 </header>
@@ -96,7 +100,21 @@
 <script>
 const API = '';
 
+function renderDeadline() {
+  const now = new Date();
+  const deadline = new Date(); deadline.setHours(10, 0, 0, 0);
+  const badge = document.getElementById('deadline-badge');
+  if (now > deadline) {
+    badge.textContent = '⛔ Besteldeadline verstreken (10:00)';
+    badge.classList.add('text-red-400');
+  } else {
+    const diff = Math.round((deadline - now) / 60000);
+    badge.textContent = `⏰ Bestellen kan nog – deadline om 10:00 (nog ${diff} min)`;
+  }
+}
+
 async function init() {
+  renderDeadline();
   await loadMenuList();
 }
 
